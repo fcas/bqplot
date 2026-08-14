@@ -281,7 +281,7 @@ export class Figure extends DOMWidgetView {
 
     this.tooltip_div = d3
       .select(document.createElement('div'))
-      .attr('class', 'tooltip_div');
+      .attr('class', 'bqplot_tooltip_div');
     this.popper_reference = new popperreference.PositionReference({
       x: 0,
       y: 0,
@@ -364,10 +364,6 @@ export class Figure extends DOMWidgetView {
     applyStyles(this.title, this.model.get('title_style'));
 
     this.title.text(this.model.get('title'));
-
-    this.tooltip_div = d3
-      .select(document.createElement('div'))
-      .attr('class', 'tooltip_div');
 
     await this.create_figure_scales();
 
@@ -454,6 +450,7 @@ export class Figure extends DOMWidgetView {
     this.model.on('save_png', this.save_png, this);
     this.model.on('save_svg', this.save_svg, this);
     this.model.on('upload_png', this.upload_png, this);
+    this.model.on('upload_svg', this.upload_svg, this);
 
     this.webGLCanvas.width = this.plotareaWidth;
     this.webGLCanvas.height = this.plotareaHeight;
@@ -1306,7 +1303,7 @@ export class Figure extends DOMWidgetView {
       get_css(this.el, ['.theme-dark', '.theme-light', '.bqplot > ', ':root']) +
       '\n';
     // extract all CSS variables, and generate a piece of css to define the variables
-    const cssVariables = cssCode.match(/(--\w[\w-]*)/g) || [];
+    const cssVariables: string[] = cssCode.match(/(--\w[\w-]*)/g) || [];
     const cssVariableCode =
       cssVariables.reduce((cssCode, variable) => {
         const value = computedStyle.getPropertyValue(variable);
@@ -1352,8 +1349,8 @@ export class Figure extends DOMWidgetView {
       .attr('href', data_url);
 
     svg.insertBefore(defs, svg.firstChild);
-    // Getting the outer HTML
-    return svg.outerHTML;
+    // Getting the outer HTML. .outerHTML replaces '\xa0' with '&nbsp;', which is invalid in SVG
+    return svg.outerHTML.replace(/&nbsp;/g, '\xa0');
   }
 
   async get_rendered_canvas(scale): Promise<HTMLCanvasElement> {
@@ -1394,6 +1391,21 @@ export class Figure extends DOMWidgetView {
         [buff]
       );
     });
+  }
+
+  async upload_svg(model) {
+    const svg_string = await this.get_svg();
+    const svg_blob = new Blob([svg_string], {
+      type: 'image/svg+xml;charset=utf-8',
+    });
+    const svg_buffer = await svg_blob.arrayBuffer();
+    model.send(
+      {
+        event: 'upload_svg',
+      },
+      null,
+      [svg_buffer]
+    );
   }
 
   save_png(filename, scale) {
